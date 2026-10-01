@@ -1,0 +1,91 @@
+workflows:
+  ios-release:
+    name: iOS Release
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+
+    integrations:
+      # Must match the name you gave your App Store Connect API key
+      # in Codemagic (Teams > Personal account > Integrations).
+      app_store_connect: codemagic
+
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      ios_signing:
+        distribution_type: app_store
+        # CHANGE THIS to your own bundle id (see step 3 below).
+        bundle_identifier: com.yourname.videoapp
+      vars:
+        # CHANGE THIS: the numeric Apple ID of your app in App Store Connect.
+        APP_STORE_APPLE_ID: 1234567890
+        # CHANGE THIS: your PC's IP address and the Node server port.
+        API_HOST: "192.168.1.20:3001"
+
+    scripts:
+      - name: Get Flutter packages
+        script: flutter packages pub get
+
+      - name: Install CocoaPods dependencies
+        script: |
+          cd ios
+          pod install
+
+      - name: Set up code signing
+        script: xcode-project use-profiles
+
+      - name: Build IPA
+        script: |
+          flutter build ipa --release \
+            --build-number=$BUILD_NUMBER \
+            --export-options-plist=/Users/builder/export_options.plist \
+            --dart-define=API_HOST=$API_HOST
+
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+
+  # Unsigned IPA: no Apple Developer account needed. Sideload it afterwards
+  # with Sideloadly or AltStore (see instructions).
+  ios-unsigned:
+    name: iOS unsigned IPA
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      vars:
+        # CHANGE THIS: your PC's IP address and the Node server port.
+        API_HOST: "192.168.96.192:3001"
+
+    scripts:
+      - name: Get Flutter packages
+        script: flutter packages pub get
+
+      - name: Install CocoaPods dependencies
+        script: |
+          cd ios
+          pod install
+
+      - name: Build app without signing
+        script: |
+          flutter build ios --release --no-codesign \
+            --dart-define=API_HOST=$API_HOST
+
+      - name: Package as IPA
+        script: |
+          mkdir -p build/ipa/Payload
+          cp -R build/ios/iphoneos/Runner.app build/ipa/Payload/
+          cd build/ipa
+          zip -qry app.ipa Payload
+
+    artifacts:
+      - build/ipa/app.ipa
