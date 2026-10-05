@@ -170,27 +170,16 @@ void _removeImage(int index) {
   Future<void> _submit() async {
     FocusScope.of(context).unfocus();
 
-    final formValid = _formKey.currentState!.validate();
+ final formValid = _formKey.currentState!.validate();
 
-    // These aren't FormFields, so validate them manually.
-    setState(() {
-      _colorError =
-          _selectedColor == null ? 'Please pick a favorite color' : null;
-      _imageError = _imageFiles.isEmpty
-    ? (_imageError ?? 'Please upload at least one image')
-    : null;
-      _songError =
-          _songFile == null ? (_songError ?? 'Please upload a song') : null;
-    });
+setState(() {
+  _colorError =
+      _selectedColor == null ? 'Please pick a favorite color' : null;
+});
 
-    if (!formValid ||
-        _selectedColor == null ||
-        _imageFiles.isEmpty ||
-        _songFile == null) {
-      return;
-    }
+if (!formValid || _selectedColor == null) return;
 
-    await _generateVideo();
+await _generateVideo();
   }
 
   Future<void> _generateVideo() async {
@@ -209,7 +198,7 @@ void _removeImage(int index) {
     VideoPlayerController? controller;
 
     try {
-      final song = _songFile!;
+      final song = _songFile;
 
 final request = http.MultipartRequest(
   'POST',
@@ -230,9 +219,11 @@ for (final image in _imageFiles) {
     http.MultipartFile.fromBytes('images', image.bytes!, filename: image.name),
   );
 }
-request.files.add(
-  http.MultipartFile.fromBytes('song', song.bytes!, filename: song.name),
-);
+if (song != null) {
+  request.files.add(
+    http.MultipartFile.fromBytes('song', song.bytes!, filename: song.name),
+  );
+}
       // The server replies after rendering, so allow plenty of time.
       final streamed = await request.send().timeout(const Duration(minutes: 5));
       final response = await http.Response.fromStream(streamed);
@@ -402,10 +393,11 @@ request.files.add(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Text(
-        'Your pictures (${_imageFiles.length}/$maxImages)',
-        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-      ),
-      const SizedBox(height: 8),
+  'Your pictures (${_imageFiles.length}/$maxImages) - optional',
+  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+),
+const SizedBox(height: 4),
+const Text('If you skip this, we will use default pictures.'),
       OutlinedButton.icon(
         onPressed: (_isGenerating || _imageFiles.length >= maxImages)
             ? null
@@ -461,7 +453,7 @@ request.files.add(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Your song',
+          'If you skip this, we will play a default song.',
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
         ),
         const SizedBox(height: 8),
